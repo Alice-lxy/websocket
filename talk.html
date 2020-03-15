@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>聊天室</title>
+</head>
+<style>
+    .comment{width:680px; position:relative} //margin:20px auto;
+    .comment h3{height:28px; line-height:28px}
+    .com_form{width:100%; position:relative}
+    .input{width:99%; height:60px; border:1px solid #ccc}
+    .com_form p{height:28px; line-height:28px; position:relative}
+    span.emotion{width:42px; height:20px; background:url(config/face/icon.gif) no-repeat 2px 2px; padding-left:20px; cursor:pointer}
+    span.emotion:hover{background-position:2px -28px}
+    .qqFace{margin-top:4px;background:#fff;padding:2px;border:1px #dfe6f6 solid;}
+    .qqFace table td{padding:0px;}
+    .qqFace table td img{cursor:pointer;border:1px #fff solid;}
+    .qqFace table td img:hover{border:1px #0066cc solid;}
+    #show{width:680px; margin:20px auto}
+    .left,.right{
+        float: left;
+    }
+    .left{
+        width: 68%;
+        height: 500px;
+        border: solid 1px blue;
+    }
+    .right{
+        width: 30%;
+        height: 500px;
+        border: 1px solid blueviolet;
+    }
+    #message{
+        height: 280px;
+        margin: 0 20px;
+        overflow-y: auto;
+    }
+    #message li{
+        list-style: none;
+        margin-top: 3px;
+    }
+    .isme{
+        text-align: right;
+    }
+    /*.color{
+        color: red;
+    }*/
+</style>
+<body>
+<div>当前登陆用户：<span id="username"></span></div>
+<br/>
+    <div>
+        <div class="left">
+            <div class="top">
+                <ul id="message">
+                    <li></li>
+                </ul>
+            </div>
+            <div>
+                <hr>
+                <div>
+                    <select name="send_user">
+                        <option value="-1">所有人</option>
+                    </select>
+                </div>
+                <textarea id="content"  name="content"
+                          style="width: 50%;height: 80px;min-width:50%;min-height:70px; ">lxy</textarea>
+                <div class="comment">
+                    <div class="com_form">
+                        <p>
+                            <span class="emotion">表情</span>
+                        </p>
+                    </div>
+                </div>
+                <button onclick="sendMessage()">发送</button>
+            </div>
+        </div>
+        <div class="right">
+            <div>用户列表</div>
+            <span id="line_history"></span>
+            <div>
+                <ul id="user_list"></ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+<script src="/config/jquery-3.2.1.min.js"></script>
+<script src="/config/face/jquery.qqFace.js"></script>
+<script type="text/javascript">
+    $(function(){
+        $('.emotion').qqFace({
+            id : 'facebox', //表情盒子的ID
+            assign:'content', //给那个控件赋值
+            path:'/config/face/face/'	//表情存放的路径
+        });
+//        $(".sub_btn").click(function(){
+//            var str = $("#saytext").val();
+//            $("#show").html(replace_em(str));
+//        });
+    });
+    //查看结果
+    function replace_em(str){
+//        str = str.replace(/\</g,'&lt;');
+//        str = str.replace(/\>/g,'&gt;');
+//        str = str.replace(/\n/g,'<br/>');
+        str = str.replace(/\[em_([0-9]*)\]/g,'<img src="config/face/face/$1.gif" border="0" />');
+        return str;
+    }
+</script>
+<script>
+    var username = ''
+    var password = '123456'
+
+    function showUser(){
+        while (username == ''){
+            username = prompt('请输入用户名')
+        }
+        while (password == ''){
+            password = prompt('请输入密码')
+        }
+        //type 1 表示发送的是登陆的数据
+        var data = '{"type":1,"username":"'+username+'","password":"'+password+'"}';
+        websocket.send( data )
+
+    }
+
+  //  var wsServer = 'ws://192.168.218.137:9502';
+    var wsServer = 'ws://140.143.74.148:9502';
+    var websocket = new WebSocket(wsServer);
+    websocket.onopen = function (evt) {
+        console.log("Connected to WebSocket server.");
+        showUser();
+    };
+
+    websocket.onclose = function (evt) {
+        console.log("Disconnected");
+    };
+
+    websocket.onmessage = function (evt) {
+//        console.log('Retrieved data from server: ' + evt.data);
+        var s_data = JSON.parse( evt.data);
+//        console.log( s_data.type );
+
+        if( s_data.type == 'connect' ){
+        }else if( s_data.type == 'login' ){
+            if(s_data.status != 1000 ){
+                user_name = '';
+                password = '';
+                alert(s_data.msg);
+                showUser();
+            }else{
+                console.log(s_data);
+                var _a = '<a href="line_history.php?fd=' + s_data['fd'] + '">聊天记录</a>';
+                $('#line_history').html( _a );
+            }
+
+            $('#username').html(username)
+        }else if( s_data.type == 'online' ){
+            $('#message').find('li').last().after(
+                    '<li>'+s_data.msg+'</li>'
+            );
+        }else if( s_data.type == 'online_list'){
+            var user_list = '';
+            var option_list = '<option value="-1">所有人</option>';
+            for( var i in s_data.list ){
+                user_list += '<li>'+s_data.list[i].username+'</li>';
+                option_list += '<option value="'+s_data.list[i].fd+'">'
+                        + s_data.list[i].username+'</option>'
+            }
+            $('#user_list').html( user_list );
+            $('[name=send_user]').html(option_list);
+
+        }else if( s_data.type == 'message'){
+            var s_mesage = s_data.msg;
+            console.log(s_mesage)
+            var new1 =replace_em( s_mesage );
+            console.log(new1);
+            if( s_data.isme == 1 ){
+                var msg = '<li class="isme">'+new1+'</li>';
+            }else{
+                var msg = '<li>'+new1+'</li>';
+            }
+            $('#message').find('li').last().after( msg );
+        }
+    };
+    function sendMessage(){
+        var content = $('#content').val();
+        var user_id = $('[name=send_user]').val();
+        console.log(user_id);
+
+//    content.replace('\r\n',"<br/>");
+        content=content.replace(/\r/g,"&nbsp;");
+        content=content.replace(/\n/g,"<br />");
+        if( user_id != -1 ){
+            var json ='{"type":2,"message":"'+content+'","sendto":'+user_id+'}';
+        }else{
+            var json ='{"type":2,"message":"'+content+'","sendto":"all"}';
+        }
+
+//        console.log(json);
+        websocket.send(json);
+    }
+
+    websocket.onerror = function (evt, e) {
+        console.log('Error occured: ' + evt.data);
+    };
+</script>
+
